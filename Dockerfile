@@ -4,9 +4,10 @@ ARG RELEASE=4.9.125
 
 FROM linuxkit/kernel:$RELEASE AS ksrc
 
-FROM ubuntu:bionic as bccbuild
+FROM debian:stretch as bccbuild
 
-RUN apt-get update && \
+RUN echo deb http://deb.debian.org/debian stretch-backports main > /etc/apt/sources.list.d/stretch-backports.list && \
+    apt-get update && \
     apt-get -y install bison build-essential cmake flex git libedit-dev \
      libllvm6.0 llvm-6.0-dev libclang-6.0-dev python zlib1g-dev libelf-dev && \
     apt-get clean
@@ -20,22 +21,19 @@ RUN git clone --single-branch --depth=1 --branch $BCC_REF https://github.com/iov
     make install && \
     git rev-parse HEAD > /bcc/usr/BCC_VERSION
 
-FROM ubuntu:bionic
+FROM golang:1.12-stretch
 # https://github.com/moby/moby/issues/34129#issuecomment-417609075
 ARG RELEASE
 
 COPY --from=ksrc /kernel-dev.tar /
 
-RUN tar xf kernel-dev.tar && \
+RUN tar xf /kernel-dev.tar -C / && \
     mkdir -p "/lib/modules/${RELEASE}-linuxkit/" && \
     ln -s "/usr/src/linux-headers-${RELEASE}-linuxkit/" "/lib/modules/${RELEASE}-linuxkit/build"
 
 RUN apt-get update && \
-    apt-get install -y golang-go git-core libelf-dev && \
+    apt-get install -y git-core libelf-dev && \
     apt-get clean
-
-ENV GOPATH /go
-RUN mkdir -p "$GOPATH/src" "$GOPATH/bin" && chmod -R 777 "$GOPATH"
 
 RUN go get github.com/iovisor/gobpf 
 
